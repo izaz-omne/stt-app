@@ -110,13 +110,13 @@ with footer_container:
 audio_hash = get_audio_hash(audio_bytes)
 
 # Add these debug lines after your audio_recorder
-st.write("Debug:")
-st.write(f"Audio bytes present: {audio_bytes is not None}")
-st.write(f"Current hash: {audio_hash}")
-st.write(f"Last hash: {st.session_state.get('last_audio_hash')}")
-st.write(f"Current engine: {selected_engine}")
-st.write(f"Current language: {selected_language}")
-st.write(f"Is option change: {st.session_state.get('is_option_change', False)}")
+# st.write("Debug:")
+# st.write(f"Audio bytes present: {audio_bytes is not None}")
+# st.write(f"Current hash: {audio_hash}")
+# st.write(f"Last hash: {st.session_state.get('last_audio_hash')}")
+# st.write(f"Current engine: {selected_engine}")
+# st.write(f"Current language: {selected_language}")
+# st.write(f"Is option change: {st.session_state.get('is_option_change', False)}")
 
 if audio_bytes and (audio_hash != st.session_state.get("last_audio_hash")) and not st.session_state.is_option_change:
     with st.spinner("Transcribing..."):
