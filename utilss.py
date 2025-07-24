@@ -29,9 +29,10 @@ def get_groq_client():
 
 @st.cache_resource
 def get_deepgram_client():
-    deepgram_api_key = os.getenv("0d154512e1c223e00f54840d6a73b9dee1c8cd41")
+    # Replace this with your actual Deepgram API key
+    deepgram_api_key = "0d154512e1c223e00f54840d6a73b9dee1c8cd41"  # Your API key
     if not deepgram_api_key:
-        st.error("DEEPGRAM_API_KEY not found in environment variables!")
+        st.error("Please add your Deepgram API key!")
         return None
     
     return DeepgramClient(deepgram_api_key)
