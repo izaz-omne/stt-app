@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 from utilss import speech_to_text
+from bangla_stt_fixed import bangla_speech_to_text, test_bangla_model, clean_bangla_text
 from audio_recorder_streamlit import audio_recorder
 from streamlit_float import *
 import hashlib
@@ -19,37 +20,56 @@ def initialize_session_state():
 
 initialize_session_state()
 
-st.title("Speech-to-Text App 🎤")
+st.title("Enhanced Speech-to-Text App 🎤")
+st.markdown("*Now with Bengali language support!*")
 
-# Transcription engine selection
-ENGINE_OPTIONS = ["Deepgram", "Python SpeechRecognition"]
+# Transcription engine selection with BanglaSpeech2Text
+ENGINE_OPTIONS = ["Deepgram", "Python SpeechRecognition", "BanglaSpeech2Text"]
 selected_engine = st.selectbox(
     "Choose transcription engine:",
     options=ENGINE_OPTIONS,
-    index=0
+    index=0,
+    help="BanglaSpeech2Text is specifically optimized for Bengali language"
 )
 
-# Deepgram supported languages (add more as needed)
-DEEPGRAM_LANGUAGES = {
-    "English (US)": "en-US",
-    "English (UK)": "en-GB",
-    "Spanish": "es",
-    "French": "fr",
-    "German": "de",
-    "Italian": "it",
-    "Portuguese": "pt",
-    "Hindi": "hi",
-    "Chinese (Mandarin)": "zh",
-    "Japanese": "ja",
-    "Korean": "ko"
-}
+# Language selection with conditional options
+if selected_engine == "BanglaSpeech2Text":
+    # For BanglaSpeech2Text, only Bengali is supported
+    LANGUAGE_OPTIONS = {
+        "Bengali (বাংলা)": "bn-BD"
+    }
+    selected_language = "Bengali (বাংলা)"
+    language_code = "bn-BD"
+    st.info("🇧🇩 BanglaSpeech2Text is optimized for Bengali language only")
+    
+    # Test the model on first load
+    if st.button("🧪 Test BanglaSpeech2Text Model"):
+        with st.spinner("Testing BanglaSpeech2Text model..."):
+            test_bangla_model()
+            
+else:
+    # For other engines, show all supported languages
+    DEEPGRAM_LANGUAGES = {
+        "English (US)": "en-US",
+        "English (UK)": "en-GB",
+        "Spanish": "es",
+        "French": "fr",
+        "German": "de",
+        "Italian": "it",
+        "Portuguese": "pt",
+        "Hindi": "hi",
+        "Chinese (Mandarin)": "zh",
+        "Japanese": "ja",
+        "Korean": "ko",
+        "Bengali (বাংলা)": "bn-BD"  # Added Bengali for other engines too
+    }
 
-selected_language = st.selectbox(
-    "Choose language for transcription:",
-    options=list(DEEPGRAM_LANGUAGES.keys()),
-    index=0
-)
-language_code = DEEPGRAM_LANGUAGES[selected_language]
+    selected_language = st.selectbox(
+        "Choose language for transcription:",
+        options=list(DEEPGRAM_LANGUAGES.keys()),
+        index=0
+    )
+    language_code = DEEPGRAM_LANGUAGES[selected_language]
 
 # Show Deepgram models dropdown only when Deepgram is selected
 if selected_engine == "Deepgram":
@@ -109,35 +129,56 @@ with footer_container:
 
 audio_hash = get_audio_hash(audio_bytes)
 
-# Add these debug lines after your audio_recorder
-# st.write("Debug:")
-# st.write(f"Audio bytes present: {audio_bytes is not None}")
-# st.write(f"Current hash: {audio_hash}")
-# st.write(f"Last hash: {st.session_state.get('last_audio_hash')}")
-# st.write(f"Current engine: {selected_engine}")
-# st.write(f"Current language: {selected_language}")
-# st.write(f"Is option change: {st.session_state.get('is_option_change', False)}")
 
 if audio_bytes and (audio_hash != st.session_state.get("last_audio_hash")) and not st.session_state.is_option_change:
-    with st.spinner("Transcribing..."):
-        temp_file_path = "temp_audio.wav" if selected_engine == "Python SpeechRecognition" else "temp_audio.mp3"
+    with st.spinner(f"Transcribing with {selected_engine}..."):
+        # Determine file extension based on engine
+        if selected_engine == "Python SpeechRecognition":
+            temp_file_path = "temp_audio.wav"
+        elif selected_engine == "BanglaSpeech2Text":
+            temp_file_path = "temp_audio.wav"  # BanglaSpeech2Text works better with WAV
+        else:
+            temp_file_path = "temp_audio.mp3"
+            
+        # Save audio to temporary file
         with open(temp_file_path, "wb") as f:
             f.write(audio_bytes)
 
+        # Transcribe based on selected engine
+        transcript = None
+        
         if selected_engine == "Deepgram":
             transcript = speech_to_text(temp_file_path, language_code, model_code)
-        else:
+            
+        elif selected_engine == "Python SpeechRecognition":
             try:
                 transcript = python_stt(temp_file_path, language_code)
             except Exception as e:
                 st.warning("Python STT only supports WAV audio. Please try again.")
                 transcript = None
+                
+        elif selected_engine == "BanglaSpeech2Text":
+            try:
+                transcript = bangla_speech_to_text(temp_file_path)
+                if transcript:
+                    transcript = clean_bangla_text(transcript)
+                    st.success("🇧🇩 Bengali transcription completed!")
+            except Exception as e:
+                st.error(f"BanglaSpeech2Text error: {e}")
+                transcript = None
 
+        # Process transcript
         if transcript and len(transcript.strip()) > 0:
-            st.session_state.transcripts.append(transcript)
+            st.session_state.transcripts.append({
+                "text": transcript,
+                "engine": selected_engine,
+                "language": selected_language,
+                "timestamp": st.session_state.get("transcript_count", len(st.session_state.transcripts))
+            })
         else:
             st.warning("Could not transcribe audio. Please try speaking again.")
 
+        # Clean up temporary file
         try:
             os.remove(temp_file_path)
         except:
@@ -146,10 +187,39 @@ if audio_bytes and (audio_hash != st.session_state.get("last_audio_hash")) and n
         st.session_state.last_audio_hash = audio_hash
 
 # Display all transcripts in a chat UI
-st.subheader("Transcription Chat History")
-for t in st.session_state.transcripts:
-    with st.chat_message("user"):
-        st.write(t)
+st.subheader("📝 Transcription Chat History")
 
-# Float the footer container and provide CSS to target it with
+if st.session_state.transcripts:
+    for i, transcript_data in enumerate(st.session_state.transcripts):
+        with st.chat_message("user"):
+            # Handle both old format (string) and new format (dict)
+            if isinstance(transcript_data, dict):
+                text = transcript_data["text"]
+                engine = transcript_data.get("engine", "Unknown")
+                language = transcript_data.get("language", "Unknown")
+                
+                # Display transcript with metadata
+                st.write(text)
+                st.caption(f"🔧 Engine: {engine} | 🌐 Language: {language}")
+                
+                # Special styling for Bengali text
+                if engine == "BanglaSpeech2Text":
+                    st.markdown(f"<div style='background-color: #e8f5e8; padding: 10px; border-radius: 5px; margin: 5px 0;'>"
+                              f"<strong>Bengali:</strong> {text}</div>", 
+                              unsafe_allow_html=True)
+            else:
+                # Legacy format - just display the text
+                st.write(transcript_data)
+else:
+    st.info("🎙️ Start recording to see your transcriptions here!")
+
+# Clear history button
+if st.session_state.transcripts:
+    if st.button("🗑️ Clear History"):
+        st.session_state.transcripts = []
+        st.session_state.last_audio_hash = None
+        st.rerun()
+
+# Float the footer container
 footer_container.float("bottom: 0rem;")
+
