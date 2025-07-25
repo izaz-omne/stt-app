@@ -1,25 +1,34 @@
 import os
+# Force CPU usage to avoid CUDA/GPU errors
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+os.environ["CT2_FORCE_CPU"] = "1"
+
 import streamlit as st
 from banglaspeech2text import Speech2Text
 from typing import Optional
 
 # Cache the Speech2Text model for better performance
 @st.cache_resource
-def load_bangla_model():
-    """Load BanglaSpeech2Text model"""
+def load_bangla_model(model_size="base"):
+    """Load BanglaSpeech2Text model with specified size (CPU-only)"""
     try:
-        # Initialize the BanglaSpeech2Text model
-        stt = Speech2Text()
+        # Initialize the BanglaSpeech2Text model with CPU-only mode to avoid CUDA issues
+        # Available sizes: tiny (~39MB), base (~74MB), small (~244MB), medium (~769MB), large (~1550MB)
+        stt = Speech2Text(
+            model_size_or_path=model_size,
+            device="cpu",  # Force CPU usage to avoid CUDA/GPU errors
+            compute_type="int8"  # Use int8 for better CPU performance
+        )
         return stt
     except Exception as e:
         st.error(f"Error loading BanglaSpeech2Text model: {e}")
         return None
 
-def bangla_speech_to_text(audio_file_path: str) -> Optional[str]:
+def bangla_speech_to_text(audio_file_path: str, model_size: str = "base") -> Optional[str]:
     """Convert Bengali speech to text using BanglaSpeech2Text package"""
     try:
-        # Load the model
-        stt = load_bangla_model()
+        # Load the model with specified size
+        stt = load_bangla_model(model_size)
         if stt is None:
             return None
         
@@ -38,13 +47,24 @@ def bangla_speech_to_text(audio_file_path: str) -> Optional[str]:
         return None
 
 # Test function for the model
-def test_bangla_model():
+def test_bangla_model(model_size: str = "base"):
     """Test if the BanglaSpeech2Text model is working"""
     try:
-        stt = load_bangla_model()
+        stt = load_bangla_model(model_size)
         if stt is not None:
-            st.success("✅ BanglaSpeech2Text model loaded successfully!")
-            st.info("📝 Model is ready for Bengali speech recognition")
+            st.success(f"✅ BanglaSpeech2Text {model_size} model loaded successfully!")
+            st.info(f"📝 Model size: {model_size} is ready for Bengali speech recognition")
+            st.info("🖥️ Running on CPU mode (no GPU required)")
+            # Show model size info
+            model_sizes = {
+                "tiny": "~39MB",
+                "base": "~74MB", 
+                "small": "~244MB",
+                "medium": "~769MB",
+                "large": "~1550MB"
+            }
+            if model_size in model_sizes:
+                st.info(f"📊 Model size: {model_sizes[model_size]}")
             return True
         else:
             st.error("❌ Failed to load BanglaSpeech2Text model")
