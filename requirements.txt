@@ -11,3 +11,4 @@ SpeechRecognition==3.10.0
 gtts==2.4.0
 langchain==0.1.0
 langchain-groq==0.0.1
+banglaspeech2text
