@@ -1,7 +1,8 @@
 import streamlit as st
 import os
 from utilss import speech_to_text
-from bangla_stt_fixed import bangla_speech_to_text, test_bangla_model, clean_bangla_text
+from bangla_stt_cpu import bangla_speech_to_text, test_bangla_model, clean_bangla_text
+# from bangla_stt_large import bangla_speech_to_text, test_bangla_model, clean_bangla_text
 from audio_recorder_streamlit import audio_recorder
 from streamlit_float import *
 import hashlib
@@ -42,10 +43,27 @@ if selected_engine == "BanglaSpeech2Text":
     language_code = "bn-BD"
     st.info("🇧🇩 BanglaSpeech2Text is optimized for Bengali language only")
     
+    # Model size selection for BanglaSpeech2Text
+    BANGLA_MODEL_SIZES = {
+        "Tiny (~39MB)": "tiny",
+        "Base (~74MB) - Recommended": "base", 
+        "Small (~244MB)": "small",
+        "Medium (~769MB)": "medium",
+        "Large (~1550MB)": "large"
+    }
+    
+    selected_bangla_model = st.selectbox(
+        "Choose BanglaSpeech2Text model size:",
+        options=list(BANGLA_MODEL_SIZES.keys()),
+        index=1,  # Default to base model
+        help="Smaller models download faster but may have lower accuracy. Base model (~74MB) is recommended for good balance."
+    )
+    bangla_model_size = BANGLA_MODEL_SIZES[selected_bangla_model]
+    
     # Test the model on first load
     if st.button("🧪 Test BanglaSpeech2Text Model"):
-        with st.spinner("Testing BanglaSpeech2Text model..."):
-            test_bangla_model()
+        with st.spinner(f"Testing BanglaSpeech2Text {bangla_model_size} model..."):
+            test_bangla_model(bangla_model_size)
             
 else:
     # For other engines, show all supported languages
@@ -105,7 +123,8 @@ def python_stt(audio_file_path, language="en-US"):
 if (
     st.session_state.get("last_engine") != selected_engine or
     st.session_state.get("last_lang") != selected_language or
-    (selected_engine == "Deepgram" and st.session_state.get("last_model") != selected_model)
+    (selected_engine == "Deepgram" and st.session_state.get("last_model") != selected_model) or
+    (selected_engine == "BanglaSpeech2Text" and st.session_state.get("last_bangla_model") != bangla_model_size)
 ):
     st.session_state.is_option_change = True
 else:
@@ -115,6 +134,8 @@ st.session_state["last_engine"] = selected_engine
 st.session_state["last_lang"] = selected_language
 if selected_engine == "Deepgram":
     st.session_state["last_model"] = selected_model
+elif selected_engine == "BanglaSpeech2Text":
+    st.session_state["last_bangla_model"] = bangla_model_size
 
 # Create footer container for the microphone
 footer_container = st.container()
@@ -129,6 +150,14 @@ with footer_container:
 
 audio_hash = get_audio_hash(audio_bytes)
 
+# Debug information (can be commented out in production)
+with st.expander("🔍 Debug Information", expanded=False):
+    st.write(f"Audio bytes present: {audio_bytes is not None}")
+    st.write(f"Current hash: {audio_hash}")
+    st.write(f"Last hash: {st.session_state.get('last_audio_hash')}")
+    st.write(f"Current engine: {selected_engine}")
+    st.write(f"Current language: {selected_language}")
+    st.write(f"Is option change: {st.session_state.get('is_option_change', False)}")
 
 if audio_bytes and (audio_hash != st.session_state.get("last_audio_hash")) and not st.session_state.is_option_change:
     with st.spinner(f"Transcribing with {selected_engine}..."):
@@ -159,10 +188,10 @@ if audio_bytes and (audio_hash != st.session_state.get("last_audio_hash")) and n
                 
         elif selected_engine == "BanglaSpeech2Text":
             try:
-                transcript = bangla_speech_to_text(temp_file_path)
+                transcript = bangla_speech_to_text(temp_file_path, bangla_model_size)
                 if transcript:
                     transcript = clean_bangla_text(transcript)
-                    st.success("🇧🇩 Bengali transcription completed!")
+                    st.success(f"🇧🇩 Bengali transcription completed with {bangla_model_size} model!")
             except Exception as e:
                 st.error(f"BanglaSpeech2Text error: {e}")
                 transcript = None
@@ -223,3 +252,33 @@ if st.session_state.transcripts:
 # Float the footer container
 footer_container.float("bottom: 0rem;")
 
+# Add information about the engines
+with st.sidebar:
+    st.header("🔧 Engine Information")
+    
+    st.subheader("BanglaSpeech2Text")
+    st.write("- Specialized for Bengali language")
+    st.write("- Multiple model sizes available")
+    st.write("- CPU-only mode (no GPU required)")
+    st.write("- Optimized for Bengali speech patterns")
+    st.write("- Model sizes:")
+    st.write("  • Tiny: ~39MB")
+    st.write("  • Base: ~74MB (Recommended)")
+    st.write("  • Small: ~244MB")
+    st.write("  • Medium: ~769MB")
+    st.write("  • Large: ~1550MB")
+    
+    st.subheader("Deepgram")
+    st.write("- Multi-language support")
+    st.write("- Fast and accurate")
+    st.write("- Multiple model options")
+    st.write("- Commercial API")
+    
+    st.subheader("Python SpeechRecognition")
+    st.write("- Uses Google's speech API")
+    st.write("- Free but limited")
+    st.write("- Requires WAV format")
+    st.write("- Good for testing")
+    
+    st.markdown("---")
+    st.markdown("**💡 Tip:** Use BanglaSpeech2Text for the best Bengali transcription results!")
