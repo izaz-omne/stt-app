@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from utilss import speech_to_text
-from bangla_stt_cpu import bangla_speech_to_text, test_bangla_model, clean_bangla_text
+from bangla_stt_fixed import bangla_speech_to_text, test_bangla_model, clean_bangla_text
 # from bangla_stt_large import bangla_speech_to_text, test_bangla_model, clean_bangla_text
 from audio_recorder_streamlit import audio_recorder
 from streamlit_float import *
